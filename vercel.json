@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "src/app/api/check-now/route.ts": {
+      "memory": 256,
+      "maxDuration": 10
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/check-now",
+      "schedule": "10/10 * * * *"
+    }
+  ]
+}

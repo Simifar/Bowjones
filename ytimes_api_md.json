@@ -1,0 +1,20 @@
+{
+  "code": 200,
+  "data": {
+    "description": "",
+    "html": "<html><head><meta name=\"color-scheme\" content=\"light dark\"></head><body><pre style=\"word-wrap: break-word; white-space: pre-wrap;\">> For the complete documentation index, see [llms.txt](https://ytimes-2.gitbook.io/ytimes-kafe/llms.txt). Markdown versions of documentation pages are available by appending `.md` to page URLs; this page is available as [Markdown](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api.md).\n\n# Внешний API\n\n{% hint style=\"info\" %}\nУточнения по API можно задать на специальный адрес <api@ytimes.ru>\n{% endhint %}\n\nВсе методы работают на уровне торговой точки. Торговых точек в аккаунте может быть несколько, поэтому предварительно нужно будет получить список торговых точек, чтобы узнать guid (идентификатор) нужной торговой точки. Далее его нужно будет передавать в методы API, чтобы получить данные этой точки.\n\n### Начало работы с API\n\nАктивировать работу по API нужно в аккаунте на странице \"**Настройки - Интеграции**\". Создать интеграцию с типом \"**Интеграция по API**\", указав права на созданную интеграцию.\n\nURL для обращений к API:&#x20;\n\n```http\nhttps://api.ytimes.ru/ex/\n```\n\nВ заголовок запросов **Authorization** необходимо передавать ключ авторизации. Ключ авторизации скопировать в настройках интеграции, созданной на странице: **Настройки - Интеграции**.&#x20;\n\nДополнительные требуемые заголовки:\n\n```http\nAccept: application/json;charset=UTF-8\nContent-Type: application/json;charset=UTF-8\n```\n\nВ запросах и ответах используется JSON. Стандартный формат ответа:\n\n```javascript\n{\n   \"success\":true/false, \n   \"count\": data size, \n   \"rows\": some data,\n   \"error\": error description\n}\n```\n</pre></body></html>",
+    "httpStatus": 200,
+    "httpStatusText": "",
+    "title": "",
+    "url": "https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api.md",
+    "usage": {
+      "tokens": 543
+    }
+  },
+  "meta": {
+    "usage": {
+      "tokens": 543
+    }
+  },
+  "status": 20000
+}

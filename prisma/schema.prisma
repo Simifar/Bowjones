@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// Bot settings (singleton pattern - only one row)
+model BotSettings {
+  id                  String   @id @default("main")
+  ytimesApiKey        String   @default("")
+  telegramBotToken    String   @default("")
+  adminChatIds        String   @default("[]") // JSON array of chat IDs
+  notificationDelay   Int      @default(15) // minutes after shift start
+  isMuted             Boolean  @default(false)
+  muteUntil           DateTime?
+  timezone            String   @default("Asia/Yekaterinburg")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Shift schedules - one per day of week
+model ShiftSchedule {
+  id          String   @id @default(cuid())
+  dayOfWeek   Int      // 0=Monday ... 6=Sunday
+  startTime   String   @default("08:00") // HH:mm format
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dayOfWeek])
+}
+
+// Cached trade points from Ytimes
+model TradePoint {
+  id      String @id @default(cuid())
+  guid    String @unique
+  name    String
+  type    String @default("")
+  cityName String @default("")
+  address String @default("")
+  phone   String @default("")
+  updatedAt DateTime @default(now())
+}
+
+// Notification history
+model NotificationLog {
+  id          String   @id @default(cuid())
+  shopName    String
+  shopGuid    String
+  shiftDate   String   // DD.MM.YYYY
+  scheduledAt String   // when shift should have started
+  message     String
+  sentAt      DateTime @default(now())
+  acknowledged Boolean @default(false)
+}
+
+// Track shift checks to avoid duplicate notifications
+model ShiftCheck {
+  id          String   @id @default(cuid())
+  shopGuid    String
+  checkDate   String   // YYYY-MM-DD
+  notifiedAt  DateTime?
+  isShiftOpen Boolean @default(false)
+  createdAt   DateTime @default(now())
+}

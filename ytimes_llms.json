@@ -1,0 +1,20 @@
+{
+  "code": 200,
+  "data": {
+    "description": "",
+    "html": "<html><head><meta name=\"color-scheme\" content=\"light dark\"></head><body><pre style=\"word-wrap: break-word; white-space: pre-wrap;\"># YTimes Кафе\n\n## YTimes Кафе\n\n- [YTimes - начало работы](https://ytimes-2.gitbook.io/ytimes-kafe/master.md)\n- [Варианты оборудования](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/varianty-oborudovaniya.md)\n- [Прайс-лист оборудования](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/prais-list-oborudovaniya.md)\n- [Установка экрана кассира](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/ustanovka-ekrana-kassira.md)\n- [Настройка банковского терминала](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/nastroika-bankovskogo-terminala.md)\n- [Терминалы Сбербанка](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/nastroika-bankovskogo-terminala/terminaly-sberbanka.md)\n- [Терминалы ARCUS2](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/nastroika-bankovskogo-terminala/terminaly-arcus2.md)\n- [Терминалы ИНПАС](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/nastroika-bankovskogo-terminala/terminaly-inpas.md)\n- [Терминалы UCS Eftpos](https://ytimes-2.gitbook.io/ytimes-kafe/nachalo-raboty/nastroika-bankovskogo-terminala/podklyuchenie-terminalov-ucs-eftpos.md)\n- [Внешний API](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api.md): позволяет настроить интеграцию с программой\n- [Торговые точки](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/torgovye-tochki.md): Работа с торговыми точками аккаунта. Требуется для работы с другими методами API\n- [Сотрудники](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/staff.md)\n- [Бронирование](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/bronirovanie.md): позволяет работать с бронями в заведении\n- [База клиентов](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/baza-klientov.md)\n- [Склад](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/sklad.md)\n- [Меню торговой точки](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/menyu-torgovoi-tochki.md)\n- [Создание заказа](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/sozdanie-zakaza.md)\n- [История продаж](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/orders.md)\n- [Кассовые смены](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/shifts.md)\n- [Как подключить интернет-магазин](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/kak-podklyuchit-internet-magazin.md)\n- [WebHook API](https://ytimes-2.gitbook.io/ytimes-kafe/integracii/vneshnii-api/webhook-api.md): получение событий от системы\n</pre></body></html>",
+    "httpStatus": 200,
+    "httpStatusText": "",
+    "title": "",
+    "url": "https://ytimes-2.gitbook.io/ytimes-kafe/llms.txt",
+    "usage": {
+      "tokens": 1055
+    }
+  },
+  "meta": {
+    "usage": {
+      "tokens": 1055
+    }
+  },
+  "status": 20000
+}

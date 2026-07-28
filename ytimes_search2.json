@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://developer.nytimes.com",
+    "name": "Developer NYTimes",
+    "snippet": "For existing users, your API keys should still work, but you'll need to re-create your account to manage your settings. Learn how to sign up for an API key. ... Missing: POS system shift cash register",
+    "host_name": "developer.nytimes.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.nytimes.com/apis",
+    "name": "APIs | Dev Portal - NYT Developer",
+    "snippet": "APIs | Dev Portal menu. Get all articles for a given month. Popular articles on NYTimes.com. Get articles currently on a section front or the home page. Missing: POS system shift cash register",
+    "host_name": "developer.nytimes.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://blog.payjunction.com/bottleneck-effect-in-business",
+    "name": "Cash Register Bottleneck Effect in Business: How to Avoid It in Your",
+    "snippet": "Updating your cash register technology and techniques can cut down on the bottleneck effect in business and improve customer satisfaction.",
+    "host_name": "blog.payjunction.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://en.syrve.help/articles/pos-9-x/cash-register-operations",
+    "name": "Cash Register Operations - Syrve Knowledge Base",
+    "snippet": "The transaction day opens when the first cash register shift opens and closes when the last cash register shift (in a group of cash register shifts) is closed. Missing: Nytimes | Show results with: Nytimes",
+    "host_name": "en.syrve.help",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.newstore.com/docs/managing-cash-1",
+    "name": "Managing cash - NewStore",
+    "snippet": "You can use Associate App to activate and deactivate a cash drawer, and to perform an intra-day audit. Cash transactions to a specific drawer ...",
+    "host_name": "docs.newstore.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://smartposai.com/blog/pos-shift-management-guide",
+    "name": "Setting Up Shift Management and Cash Tracking - SmartPOS AI Blog",
+    "snippet": "Every shift in SmartPOS AI begins when an employee logs in with their unique PIN code and opens a new shift from the POS screen.",
+    "host_name": "smartposai.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://changelog.shopify.com/posts/new-cash-management-foundations-for-shopify-pos",
+    "name": "New Cash Management Foundations for Shopify POS",
+    "snippet": "Use APIs to open and close sessions programmatically, create cash drawers and reason codes, assign devices to a drawer, and pull custom reports.",
+    "host_name": "changelog.shopify.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.fiskaltrust.cloud/apis/pos-system-api",
+    "name": "fiskaltrust PosSystem API (2.0)",
+    "snippet": "This API provides a variety of different functionalities for POS systems and is the central entry point to the **fiskaltrust.Middleware**. Missing: Nytimes shift",
+    "host_name": "docs.fiskaltrust.cloud",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://products.zetaglobal.com/loyalty/Content/Articles/Technical%20Documentation/POS%20API%20Developer%20Guide.htm",
+    "name": "Point of Sale API Developer Guide - Zeta Global",
+    "snippet": "This article describes the Loyalty APIs that allow third-party Point of Sale (POS) systems, such as MICROS RES, RICS, and Squirrel POS, to communicate with the ... Missing: Nytimes shift",
+    "host_name": "products.zetaglobal.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/open-mercato/open-mercato/blob/main/.ai/specs/SPEC-022-2026-02-07-pos-module.md",
+    "name": "SPEC-022-2026-02-07-pos-module.md - GitHub",
+    "snippet": "Enable fast cart-based checkout with scan/search, price overrides, and discounts. Support multi-method payment processing (cash/card/split ...",
+    "host_name": "github.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

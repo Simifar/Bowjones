@@ -1,0 +1,758 @@
+     1→     1→     1→// BowJones Telegram Bot - Cash Register Shift Monitor
+     2→     2→     2→// Monitors Ytimes POS API and notifies via Telegram when cash register not opened after shift start time
+     3→     3→     3→
+     4→     4→     4→const PORT = 3003;
+     5→     5→     5→const MAIN_PROJECT = '/home/z/my-project';
+     6→     6→     6→const DB_PATH = `${MAIN_PROJECT}/db/custom.db`;
+     7→     7→     7→
+     8→     8→     8→// ============ Database (Bun built-in SQLite) ============
+     9→     9→     9→import { Database } from 'bun:sqlite';
+    10→    10→    10→const db = new Database(DB_PATH);
+    11→    11→    11→
+    12→    12→    12→// ============ State ============
+    13→    13→    13→let settings: BotSettings = getDefaultSettings();
+    14→    14→    14→let schedules: ShiftScheduleRow[] = [];
+    15→    15→    15→let isMuted = false;
+    16→    16→    16→let muteUntil: Date | null = null;
+    17→    17→    17→let lastCheckTime: Date | null = null;
+    18→    18→    18→let checkInProgress = false;
+    19→    19→    19→
+    20→    20→    20→// ============ Types ============
+    21→    21→    21→interface BotSettings {
+    22→    22→    22→  ytimesApiKey: string;
+    23→    23→    23→  telegramBotToken: string;
+    24→    24→    24→  adminChatIds: number[];
+    25→    25→    25→  notificationDelay: number;
+    26→    26→    26→  timezone: string;
+    27→    27→    27→  isMuted: boolean;
+    28→    28→    28→  muteUntil: string | null;
+    29→    29→    29→}
+    30→    30→    30→
+    31→    31→    31→interface ShiftScheduleRow {
+    32→    32→    32→  dayOfWeek: number;
+    33→    33→    33→  startTime: string;
+    34→    34→    34→  isEnabled: boolean;
+    35→    35→    35→}
+    36→    36→    36→
+    37→    37→    37→interface YtimesShift {
+    38→    38→    38→  guid: string;
+    39→    39→    39→  shopGuid: string;
+    40→    40→    40→  date: string;
+    41→    41→    41→  number: number;
+    42→    42→    42→  userList: Array<{
+    43→    43→    43→    id: number;
+    44→    44→    44→    start: string;
+    45→    45→    45→    end: string | null;
+    46→    46→    46→  }>;
+    47→    47→    47→  cashStartValue: number;
+    48→    48→    48→  cashCheckValue: number;
+    49→    49→    49→}
+    50→    50→    50→
+    51→    51→    51→interface YtimesShop {
+    52→    52→    52→  guid: string;
+    53→    53→    53→  name: string;
+    54→    54→    54→  type: string;
+    55→    55→    55→  cityName: string;
+    56→    56→    56→  address: string;
+    57→    57→    57→  phone: string | null;
+    58→    58→    58→}
+    59→    59→    59→
+    60→    60→    60→// ============ Defaults ============
+    61→    61→    61→function getDefaultSettings(): BotSettings {
+    62→    62→    62→  return {
+    63→    63→    63→    ytimesApiKey: '',
+    64→    64→    64→    telegramBotToken: '',
+    65→    65→    65→    adminChatIds: [],
+    66→    66→    66→    notificationDelay: 15,
+    67→    67→    67→    timezone: 'Asia/Yekaterinburg',
+    68→    68→    68→    isMuted: false,
+    69→    69→    69→    muteUntil: null,
+    70→    70→    70→  };
+    71→    71→    71→}
+    72→    72→    72→
+    73→    73→    73→// ============ Settings Loader ============
+    74→    74→    74→function reloadSettings() {
+    75→    75→    75→  try {
+    76→    76→    76→    const row = db.query('SELECT * FROM BotSettings WHERE id = ?').get('main') as any;
+    77→    77→    77→    if (row) {
+    78→    78→    78→      settings = {
+    79→    79→    79→        ytimesApiKey: row.ytimesApiKey || '',
+    80→    80→    80→        telegramBotToken: row.telegramBotToken || '',
+    81→    81→    81→        adminChatIds: JSON.parse(row.adminChatIds || '[]'),
+    82→    82→    82→        notificationDelay: row.notificationDelay || 15,
+    83→    83→    83→        timezone: row.timezone || 'Asia/Yekaterinburg',
+    84→    84→    84→        isMuted: !!row.isMuted,
+    85→    85→    85→        muteUntil: row.muteUntil || null,
+    86→    86→    86→      };
+    87→    87→    87→    }
+    88→    88→    88→  } catch (e) {
+    89→    89→    89→    console.error('Failed to reload settings:', e);
+    90→    90→    90→  }
+    91→    91→    91→
+    92→    92→    92→  try {
+    93→    93→    93→    const rows = db.query('SELECT * FROM ShiftSchedule ORDER BY dayOfWeek').all() as any[];
+    94→    94→    94→    schedules = rows.map((r: any) => ({
+    95→    95→    95→      dayOfWeek: r.dayOfWeek,
+    96→    96→    96→      startTime: r.startTime || '08:00',
+    97→    97→    97→      isEnabled: !!r.isEnabled,
+    98→    98→    98→    }));
+    99→    99→    99→  } catch (e) {
+   100→   100→   100→    console.error('Failed to reload schedules:', e);
+   101→   101→   101→  }
+   102→   102→   102→
+   103→   103→   103→  // Check mute expiry
+   104→   104→   104→  if (settings.isMuted && settings.muteUntil) {
+   105→   105→   105→    const muteEnd = new Date(settings.muteUntil);
+   106→   106→   106→    if (new Date() > muteEnd) {
+   107→   107→   107→      isMuted = false;
+   108→   108→   108→      try {
+   109→   109→   109→        db.query("UPDATE BotSettings SET isMuted = 0, muteUntil = NULL WHERE id = 'main'").run();
+   110→   110→   110→      } catch {}
+   111→   111→   111→    } else {
+   112→   112→   112→      isMuted = true;
+   113→   113→   113→      muteUntil = muteEnd;
+   114→   114→   114→    }
+   115→   115→   115→  } else {
+   116→   116→   116→    isMuted = settings.isMuted;
+   117→   117→   117→    muteUntil = null;
+   118→   118→   118→  }
+   119→   119→   119→}
+   120→   120→   120→
+   121→   121→   121→// ============ Telegram API ============
+   122→   122→   122→async function telegramApi(method: string, payload: any = {}): Promise<any> {
+   123→   123→   123→  if (!settings.telegramBotToken) {
+   124→   124→   124→    throw new Error('Telegram bot token not configured');
+   125→   125→   125→  }
+   126→   126→   126→  const url = `https://api.telegram.org/bot${settings.telegramBotToken}/${method}`;
+   127→   127→   127→  const resp = await fetch(url, {
+   128→   128→   128→    method: 'POST',
+   129→   129→   129→    headers: { 'Content-Type': 'application/json' },
+   130→   130→   130→    body: JSON.stringify(payload),
+   131→   131→   131→  });
+   132→   132→   132→  const data = await resp.json();
+   133→   133→   133→  if (!data.ok) {
+   134→   134→   134→    throw new Error(`Telegram API error: ${data.description || JSON.stringify(data)}`);
+   135→   135→   135→  }
+   136→   136→   136→  return data.result;
+   137→   137→   137→}
+   138→   138→   138→
+   139→   139→   139→async function sendMessage(chatId: number, text: string, parseMode: string = 'HTML') {
+   140→   140→   140→  return telegramApi('sendMessage', {
+   141→   141→   141→    chat_id: chatId,
+   142→   142→   142→    text,
+   143→   143→   143→    parse_mode: parseMode,
+   144→   144→   144→    disable_web_page_preview: true,
+   145→   145→   145→  });
+   146→   146→   146→}
+   147→   147→   147→
+   148→   148→   148→async function sendToAllAdmins(text: string) {
+   149→   149→   149→  if (isMuted) {
+   150→   150→   150→    console.log('[MUTED] Skipping notification:', text.substring(0, 50));
+   151→   151→   151→    return;
+   152→   152→   152→  }
+   153→   153→   153→  for (const chatId of settings.adminChatIds) {
+   154→   154→   154→    try {
+   155→   155→   155→      await sendMessage(chatId, text);
+   156→   156→   156→      console.log(`[TG] Sent to chat ${chatId}`);
+   157→   157→   157→    } catch (e: any) {
+   158→   158→   158→      console.error(`[TG] Failed to send to chat ${chatId}:`, e.message);
+   159→   159→   159→    }
+   160→   160→   160→  }
+   161→   161→   161→}
+   162→   162→   162→
+   163→   163→   163→// ============ Ytimes API ============
+   164→   164→   164→async function ytimesApi(endpoint: string, method: string = 'GET', body?: any): Promise<any> {
+   165→   165→   165→  if (!settings.ytimesApiKey) {
+   166→   166→   166→    throw new Error('Ytimes API key not configured');
+   167→   167→   167→  }
+   168→   168→   168→  const url = `https://api.ytimes.ru/ex/${endpoint}`;
+   169→   169→   169→  const headers: Record<string, string> = {
+   170→   170→   170→    'Accept': 'application/json;charset=UTF-8',
+   171→   171→   171→    'Authorization': settings.ytimesApiKey,
+   172→   172→   172→  };
+   173→   173→   173→
+   174→   174→   174→  const options: RequestInit = { method, headers };
+   175→   175→   175→  if (body && method !== 'GET') {
+   176→   176→   176→    headers['Content-Type'] = 'application/json;charset=UTF-8';
+   177→   177→   177→    options.body = JSON.stringify(body);
+   178→   178→   178→  }
+   179→   179→   179→
+   180→   180→   180→  const resp = await fetch(url, options);
+   181→   181→   181→  const data = await resp.json();
+   182→   182→   182→
+   183→   183→   183→  if (!data.success) {
+   184→   184→   184→    throw new Error(`Ytimes API error: ${data.error || 'Unknown error'}`);
+   185→   185→   185→  }
+   186→   186→   186→  return data;
+   187→   187→   187→}
+   188→   188→   188→
+   189→   189→   189→async function getShops(): Promise<YtimesShop[]> {
+   190→   190→   190→  const data = await ytimesApi('shop/list');
+   191→   191→   191→  return data.rows || [];
+   192→   192→   192→}
+   193→   193→   193→
+   194→   194→   194→async function getShifts(dateFrom: string, dateTo: string, shopGuid?: string): Promise<YtimesShift[]> {
+   195→   195→   195→  const body: any = { dateFrom, dateTo };
+   196→   196→   196→  if (shopGuid) body.shopGuid = shopGuid;
+   197→   197→   197→  const data = await ytimesApi('shift/list', 'POST', body);
+   198→   198→   198→  return data.rows || [];
+   199→   199→   199→}
+   200→   200→   200→
+   201→   201→   201→// ============ Shift Monitoring Logic ============
+   202→   202→   202→function getTimezoneDate(): Date {
+   203→   203→   203→  const now = new Date();
+   204→   204→   204→  const tz = settings.timezone || 'Asia/Yekaterinburg';
+   205→   205→   205→  const str = now.toLocaleString('en-US', { timeZone: tz });
+   206→   206→   206→  return new Date(str);
+   207→   207→   207→}
+   208→   208→   208→
+   209→   209→   209→function formatDateDDMMYYYY(date: Date): string {
+   210→   210→   210→  const d = String(date.getDate()).padStart(2, '0');
+   211→   211→   211→  const m = String(date.getMonth() + 1).padStart(2, '0');
+   212→   212→   212→  const y = date.getFullYear();
+   213→   213→   213→  return `${d}.${m}.${y}`;
+   214→   214→   214→}
+   215→   215→   215→
+   216→   216→   216→function getTodaySchedule(): ShiftScheduleRow | undefined {
+   217→   217→   217→  const tzDate = getTimezoneDate();
+   218→   218→   218→  // getDay(): 0=Sunday, 1=Monday, ... 6=Saturday
+   219→   219→   219→  // Our schema: 0=Monday, 6=Sunday
+   220→   220→   220→  const jsDay = tzDate.getDay();
+   221→   221→   221→  const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+   222→   222→   222→  return schedules.find(s => s.dayOfWeek === ourDay && s.isEnabled);
+   223→   223→   223→}
+   224→   224→   224→
+   225→   225→   225→function formatTime(date: Date): string {
+   226→   226→   226→  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: settings.timezone });
+   227→   227→   227→}
+   228→   228→   228→
+   229→   229→   229→function generateId(): string {
+   230→   230→   230→  const chars = 'abcdef0123456789';
+   231→   231→   231→  let id = '';
+   232→   232→   232→  for (let i = 0; i < 25; i++) {
+   233→   233→   233→    id += chars[Math.floor(Math.random() * chars.length)];
+   234→   234→   234→  }
+   235→   235→   235→  return id;
+   236→   236→   236→}
+   237→   237→   237→
+   238→   238→   238→async function checkShifts(): Promise<{ checked: boolean; message: string; notifications: any[] }> {
+   239→   239→   239→  if (checkInProgress) {
+   240→   240→   240→    return { checked: false, message: 'Check already in progress', notifications: [] };
+   241→   241→   241→  }
+   242→   242→   242→
+   243→   243→   243→  if (!settings.ytimesApiKey || !settings.telegramBotToken) {
+   244→   244→   244→    return { checked: false, message: 'Bot not fully configured (missing API key or token)', notifications: [] };
+   245→   245→   245→  }
+   246→   246→   246→
+   247→   247→   247→  checkInProgress = true;
+   248→   248→   248→  const notifications: any[] = [];
+   249→   249→   249→
+   250→   250→   250→  try {
+   251→   251→   251→    const todaySchedule = getTodaySchedule();
+   252→   252→   252→    if (!todaySchedule) {
+   253→   253→   253→      lastCheckTime = new Date();
+   254→   254→   254→      return { checked: true, message: 'No schedule for today', notifications: [] };
+   255→   255→   255→    }
+   256→   256→   256→
+   257→   257→   257→    const tzDate = getTimezoneDate();
+   258→   258→   258→    const [startHour, startMinute] = todaySchedule.startTime.split(':').map(Number);
+   259→   259→   259→    const shiftStart = new Date(tzDate);
+   260→   260→   260→    shiftStart.setHours(startHour, startMinute, 0, 0);
+   261→   261→   261→
+   262→   262→   262→    const now = tzDate;
+   263→   263→   263→    const minutesSinceStart = Math.floor((now.getTime() - shiftStart.getTime()) / 60000);
+   264→   264→   264→
+   265→   265→   265→    // Only check if we're past the notification delay
+   266→   266→   266→    if (minutesSinceStart < settings.notificationDelay) {
+   267→   267→   267→      lastCheckTime = new Date();
+   268→   268→   268→      return {
+   269→   269→   269→        checked: true,
+   270→   270→   270→        message: `Shift not yet due (starts at ${todaySchedule.startTime}, ${minutesSinceStart}min elapsed, need ${settings.notificationDelay}min)`,
+   271→   271→   271→        notifications: [],
+   272→   272→   272→      };
+   273→   273→   273→    }
+   274→   274→   274→
+   275→   275→   275→    // Don't check if shift started more than 3 hours ago
+   276→   276→   276→    if (minutesSinceStart > 180) {
+   277→   277→   277→      lastCheckTime = new Date();
+   278→   278→   278→      return { checked: true, message: 'Shift started more than 3 hours ago, skipping', notifications: [] };
+   279→   279→   279→    }
+   280→   280→   280→
+   281→   281→   281→    // Check if we already notified today
+   282→   282→   282→    const todayStr = formatDateDDMMYYYY(tzDate);
+   283→   283→   283→    const existingCheck = db.query(
+   284→   284→   284→      'SELECT * FROM ShiftCheck WHERE checkDate = ? LIMIT 1'
+   285→   285→   285→    ).get(todayStr) as any;
+   286→   286→   286→
+   287→   287→   287→    if (existingCheck && existingCheck.notifiedAt) {
+   288→   288→   288→      lastCheckTime = new Date();
+   289→   289→   289→      return { checked: true, message: 'Already notified for today', notifications: [] };
+   290→   290→   290→    }
+   291→   291→   291→
+   292→   292→   292→    // Fetch shops from Ytimes
+   293→   293→   293→    let shops: YtimesShop[] = [];
+   294→   294→   294→    try {
+   295→   295→   295→      shops = await getShops();
+   296→   296→   296→    } catch (e: any) {
+   297→   297→   297→      console.error('[YTIMES] Failed to fetch shops:', e.message);
+   298→   298→   298→      return { checked: true, message: `Ytimes API error: ${e.message}`, notifications: [] };
+   299→   299→   299→    }
+   300→   300→   300→
+   301→   301→   301→    // Cache shops
+   302→   302→   302→    const upsertShop = db.prepare(`
+   303→   303→   303→      INSERT INTO TradePoint (id, guid, name, type, cityName, address, phone, updatedAt)
+   304→   304→   304→      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+   305→   305→   305→      ON CONFLICT(guid) DO UPDATE SET
+   306→   306→   306→        name = excluded.name, type = excluded.type, cityName = excluded.cityName,
+   307→   307→   307→        address = excluded.address, phone = excluded.phone, updatedAt = datetime('now')
+   308→   308→   308→    `);
+   309→   309→   309→    for (const shop of shops) {
+   310→   310→   310→      try {
+   311→   311→   311→        upsertShop.run(generateId(), shop.guid, shop.name, shop.type, shop.cityName, shop.address, shop.phone || '');
+   312→   312→   312→      } catch {}
+   313→   313→   313→    }
+   314→   314→   314→
+   315→   315→   315→    // Fetch today's shifts
+   316→   316→   316→    let shifts: YtimesShift[] = [];
+   317→   317→   317→    try {
+   318→   318→   318→      shifts = await getShifts(todayStr, todayStr);
+   319→   319→   319→    } catch (e: any) {
+   320→   320→   320→      console.error('[YTIMES] Failed to fetch shifts:', e.message);
+   321→   321→   321→      return { checked: true, message: `Ytimes shift API error: ${e.message}`, notifications: [] };
+   322→   322→   322→    }
+   323→   323→   323→
+   324→   324→   324→    // Check which shops have open shifts
+   325→   325→   325→    const openShiftShopGuids = new Set(shifts.map(s => s.shopGuid));
+   326→   326→   326→
+   327→   327→   327→    // Find shops that don't have an open shift
+   328→   328→   328→    const closedShops = shops.filter(s => !openShiftShopGuids.has(s.guid));
+   329→   329→   329→
+   330→   330→   330→    if (closedShops.length === 0) {
+   331→   331→   331→      db.query(`
+   332→   332→   332→        INSERT OR REPLACE INTO ShiftCheck (id, shopGuid, checkDate, notifiedAt, isShiftOpen, createdAt)
+   333→   333→   333→        VALUES (?, 'all', ?, datetime('now'), 1, datetime('now'))
+   334→   334→   334→      `).run(generateId(), todayStr);
+   335→   335→   335→      lastCheckTime = new Date();
+   336→   336→   336→      return { checked: true, message: 'All shifts are open', notifications: [] };
+   337→   337→   337→    }
+   338→   338→   338→
+   339→   339→   339→    // There are shops without open shifts - notify!
+   340→   340→   340→    const insertNotif = db.prepare(`
+   341→   341→   341→      INSERT INTO NotificationLog (id, shopName, shopGuid, shiftDate, scheduledAt, message, sentAt, acknowledged)
+   342→   342→   342→      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), 0)
+   343→   343→   343→    `);
+   344→   344→   344→
+   345→   345→   345→    for (const shop of closedShops) {
+   346→   346→   346→      const message = `⚠️ <b>Касса не открыта!</b>\n\n` +
+   347→   347→   347→        `🏪 <b>${shop.name}</b>\n` +
+   348→   348→   348→        `📅 Дата: ${todayStr}\n` +
+   349→   349→   349→        `⏰ Смена должна начаться: ${todaySchedule.startTime}\n` +
+   350→   350→   350→        `⏱ Прошло: ${minutesSinceStart} мин.\n\n` +
+   351→   351→   351→        `<i>Откройте кассу как можно скорее!</i>`;
+   352→   352→   352→
+   353→   353→   353→      if (!isMuted) {
+   354→   354→   354→        for (const chatId of settings.adminChatIds) {
+   355→   355→   355→          try {
+   356→   356→   356→            await sendMessage(chatId, message);
+   357→   357→   357→            notifications.push({ shopName: shop.name, sent: true });
+   358→   358→   358→          } catch (e: any) {
+   359→   359→   359→            console.error(`Failed to notify for ${shop.name}:`, e.message);
+   360→   360→   360→            notifications.push({ shopName: shop.name, sent: false, error: e.message });
+   361→   361→   361→          }
+   362→   362→   362→        }
+   363→   363→   363→      }
+   364→   364→   364→
+   365→   365→   365→      // Log notification
+   366→   366→   366→      try {
+   367→   367→   367→        insertNotif.run(generateId(), shop.name, shop.guid, todayStr, todaySchedule.startTime, message);
+   368→   368→   368→      } catch (e: any) {
+   369→   369→   369→        console.error('Failed to log notification:', e.message);
+   370→   370→   370→      }
+   371→   371→   371→
+   372→   372→   372→      // Also notify via webhook to Next.js
+   373→   373→   373→      try {
+   374→   374→   374→        await fetch(`http://localhost:3000/api/bot-webhook`, {
+   375→   375→   375→          method: 'POST',
+   376→   376→   376→          headers: { 'Content-Type': 'application/json' },
+   377→   377→   377→          body: JSON.stringify({
+   378→   378→   378→            type: 'notification_sent',
+   379→   379→   379→            data: {
+   380→   380→   380→              shopName: shop.name,
+   381→   381→   381→              shopGuid: shop.guid,
+   382→   382→   382→              shiftDate: todayStr,
+   383→   383→   383→              scheduledAt: todaySchedule.startTime,
+   384→   384→   384→              message,
+   385→   385→   385→            },
+   386→   386→   386→          }),
+   387→   387→   387→        });
+   388→   388→   388→      } catch {}
+   389→   389→   389→    }
+   390→   390→   390→
+   391→   391→   391→    // Record that we checked
+   392→   392→   392→    db.query(`
+   393→   393→   393→      INSERT OR REPLACE INTO ShiftCheck (id, shopGuid, checkDate, notifiedAt, isShiftOpen, createdAt)
+   394→   394→   394→      VALUES (?, 'all', ?, datetime('now'), 0, datetime('now'))
+   395→   395→   395→    `).run(generateId(), todayStr);
+   396→   396→   396→
+   397→   397→   397→    lastCheckTime = new Date();
+   398→   398→   398→    const statusMsg = closedShops.length === shops.length
+   399→   399→   399→      ? 'No shifts are open!'
+   400→   400→   400→      : `${closedShops.map(s => s.name).join(', ')} — no shift open`;
+   401→   401→   401→
+   402→   402→   402→    return { checked: true, message: statusMsg, notifications };
+   403→   403→   403→  } finally {
+   404→   404→   404→    checkInProgress = false;
+   405→   405→   405→  }
+   406→   406→   406→}
+   407→   407→   407→
+   408→   408→   408→// ============ Telegram Bot Command Handler ============
+   409→   409→   409→async function handleUpdate(update: any) {
+   410→   410→   410→  const message = update.message;
+   411→   411→   411→  if (!message || !message.text) return;
+   412→   412→   412→
+   413→   413→   413→  const chatId = message.chat.id;
+   414→   414→   414→  const text = message.text;
+   415→   415→   415→  const from = message.from;
+   416→   416→   416→
+   417→   417→   417→  console.log(`[TG] Message from ${from?.first_name || 'unknown'} (${chatId}): ${text}`);
+   418→   418→   418→
+   419→   419→   419→  // Check if user is admin
+   420→   420→   420→  if (!settings.adminChatIds.includes(chatId)) {
+   421→   421→   421→    if (text === '/start') {
+   422→   422→   422→      await sendMessage(chatId,
+   423→   423→   423→        '👋 Этот бот предназначен для администраторов BowJones.\n\n' +
+   424→   424→   424→        'Для получения доступа обратитесь к администратору системы.'
+   425→   425→   425→      );
+   426→   426→   426→    }
+   427→   427→   427→    return;
+   428→   428→   428→  }
+   429→   429→   429→
+   430→   430→   430→  // Handle commands
+   431→   431→   431→  switch (text) {
+   432→   432→   432→    case '/start':
+   433→   433→   433→      await sendMessage(chatId,
+   434→   434→   434→        '☕ <b>BowJones Monitor</b>\n\n' +
+   435→   435→   435→        'Бот отслеживает открытие кассы в Ytimes и уведомляет, если смена не начата вовремя.\n\n' +
+   436→   436→   436→        '<b>Команды:</b>\n' +
+   437→   437→   437→        '/status — Текущий статус\n' +
+   438→   438→   438→        '/schedule — Расписание на сегодня\n' +
+   439→   439→   439→        '/check — Проверить сейчас\n' +
+   440→   440→   440→        '/shops — Торговые точки\n' +
+   441→   441→   441→        '/mute — Включить беззвучный режим\n' +
+   442→   442→   442→        '/unmute — Выключить беззвучный режим\n' +
+   443→   443→   443→        '/history — Последние уведомления\n' +
+   444→   444→   444→        '/help — Помощь'
+   445→   445→   445→      );
+   446→   446→   446→      break;
+   447→   447→   447→
+   448→   448→   448→    case '/help':
+   449→   449→   449→      await sendMessage(chatId,
+   450→   450→   450→        '☕ <b>Справка BowJones Monitor</b>\n\n' +
+   451→   451→   451→        '<b>Команды:</b>\n\n' +
+   452→   452→   452→        '/status — Показать текущий статус бота и кассы\n' +
+   453→   453→   453→        '/schedule — Расписание смен на сегодня\n' +
+   454→   454→   454→        '/check — Принудительная проверка кассы\n' +
+   455→   455→   455→        '/shops — Список подключённых торговых точек\n' +
+   456→   456→   456→        '/mute — Временно отключить уведомления\n' +
+   457→   457→   457→        '/unmute — Включить уведомления\n' +
+   458→   458→   458→        '/history — 5 последних уведомлений\n' +
+   459→   459→   459→        '/help — Эта справка'
+   460→   460→   460→      );
+   461→   461→   461→      break;
+   462→   462→   462→
+   463→   463→   463→    case '/status': {
+   464→   464→   464→      const todaySchedule = getTodaySchedule();
+   465→   465→   465→      const botConfigured = !!(settings.ytimesApiKey && settings.telegramBotToken);
+   466→   466→   466→      const muteStatus = isMuted
+   467→   467→   467→        ? `🔇 Беззвучный режим (до ${muteUntil ? formatTime(muteUntil) : 'отмены'})`
+   468→   468→   468→        : '🔊 Уведомления включены';
+   469→   469→   469→
+   470→   470→   470→      const scheduleInfo = todaySchedule
+   471→   471→   471→        ? `⏰ Смена сегодня: <b>${todaySchedule.startTime}</b> (задержка: ${settings.notificationDelay} мин)`
+   472→   472→   472→        : '❌ Нет расписания на сегодня';
+   473→   473→   473→
+   474→   474→   474→      const lastCheck = lastCheckTime
+   475→   475→   475→        ? `🕐 Последняя проверка: ${formatTime(lastCheckTime)}`
+   476→   476→   476→        : '🕐 Проверок ещё не было';
+   477→   477→   477→
+   478→   478→   478→      await sendMessage(chatId,
+   479→   479→   479→        `📊 <b>Статус BowJones Monitor</b>\n\n` +
+   480→   480→   480→        `🤖 Бот: ${botConfigured ? '✅ Активен' : '❌ Не настроен'}\n` +
+   481→   481→   481→        `🔑 Ytimes API: ${settings.ytimesApiKey ? '✅ Подключён' : '❌ Не подключён'}\n` +
+   482→   482→   482→        `${muteStatus}\n\n` +
+   483→   483→   483→        `${scheduleInfo}\n` +
+   484→   484→   484→        `${lastCheck}`
+   485→   485→   485→      );
+   486→   486→   486→      break;
+   487→   487→   487→    }
+   488→   488→   488→
+   489→   489→   489→    case '/schedule': {
+   490→   490→   490→      const todaySchedule = getTodaySchedule();
+   491→   491→   491→      const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+   492→   492→   492→      const tzDate = getTimezoneDate();
+   493→   493→   493→      const jsDay = tzDate.getDay();
+   494→   494→   494→      const ourDay = jsDay === 0 ? 6 : jsDay - 1;
+   495→   495→   495→      const todayName = dayNames[ourDay];
+   496→   496→   496→
+   497→   497→   497→      let scheduleMsg = `📅 <b>Расписание — ${todayName}</b>\n\n`;
+   498→   498→   498→      for (const s of schedules) {
+   499→   499→   499→        const icon = s.isEnabled ? '✅' : '⬜';
+   500→   500→   500→        scheduleMsg += `${icon} ${dayNames[s.dayOfWeek]}: ${s.isEnabled ? `<b>${s.startTime}</b>` : 'выкл'}\n`;
+   501→   501→   501→      }
+   502→   502→   502→
+   503→   503→   503→      scheduleMsg += `\n⏱ Задержка уведомления: <b>${settings.notificationDelay} мин</b>`;
+   504→   504→   504→
+   505→   505→   505→      await sendMessage(chatId, scheduleMsg);
+   506→   506→   506→      break;
+   507→   507→   507→    }
+   508→   508→   508→
+   509→   509→   509→    case '/check': {
+   510→   510→   510→      await sendMessage(chatId, '🔍 Проверяю статус кассы...');
+   511→   511→   511→      const result = await checkShifts();
+   512→   512→   512→      const icon = result.checked ? '✅' : '⏳';
+   513→   513→   513→      await sendMessage(chatId, `${icon} ${result.message}`);
+   514→   514→   514→      break;
+   515→   515→   515→    }
+   516→   516→   516→
+   517→   517→   517→    case '/shops': {
+   518→   518→   518→      try {
+   519→   519→   519→        const shops = await getShops();
+   520→   520→   520→        if (shops.length === 0) {
+   521→   521→   521→          await sendMessage(chatId, '❌ Не удалось получить список торговых точек. Проверьте API ключ.');
+   522→   522→   522→          break;
+   523→   523→   523→        }
+   524→   524→   524→
+   525→   525→   525→        let shopsMsg = `🏪 <b>Торговые точки (${shops.length})</b>\n\n`;
+   526→   526→   526→        for (const shop of shops) {
+   527→   527→   527→          shopsMsg += `• <b>${shop.name}</b>\n`;
+   528→   528→   528→          if (shop.cityName) shopsMsg += `  📍 ${shop.cityName}, ${shop.address}\n`;
+   529→   529→   529→          shopsMsg += '\n';
+   530→   530→   530→        }
+   531→   531→   531→
+   532→   532→   532→        await sendMessage(chatId, shopsMsg);
+   533→   533→   533→      } catch (e: any) {
+   534→   534→   534→        await sendMessage(chatId, `❌ Ошибка: ${e.message}`);
+   535→   535→   535→      }
+   536→   536→   536→      break;
+   537→   537→   537→    }
+   538→   538→   538→
+   539→   539→   539→    case '/mute': {
+   540→   540→   540→      isMuted = true;
+   541→   541→   541→      const muteEnd = new Date(Date.now() + 4 * 60 * 60 * 1000);
+   542→   542→   542→      muteUntil = muteEnd;
+   543→   543→   543→      try {
+   544→   544→   544→        db.query("UPDATE BotSettings SET isMuted = 1, muteUntil = ? WHERE id = 'main'").run(muteEnd.toISOString());
+   545→   545→   545→      } catch {}
+   546→   546→   546→      await sendMessage(chatId,
+   547→   547→   547→        `🔇 <b>Беззвучный режим включён</b>\n\n` +
+   548→   548→   548→        `Уведомления отключены до ${formatTime(muteEnd)}\n` +
+   549→   549→   549→        `Для отключения: /unmute`
+   550→   550→   550→      );
+   551→   551→   551→      break;
+   552→   552→   552→    }
+   553→   553→   553→
+   554→   554→   554→    case '/unmute': {
+   555→   555→   555→      isMuted = false;
+   556→   556→   556→      muteUntil = null;
+   557→   557→   557→      try {
+   558→   558→   558→        db.query("UPDATE BotSettings SET isMuted = 0, muteUntil = NULL WHERE id = 'main'").run();
+   559→   559→   559→      } catch {}
+   560→   560→   560→      await sendMessage(chatId, '🔊 <b>Уведомления включены</b>');
+   561→   561→   561→      break;
+   562→   562→   562→    }
+   563→   563→   563→
+   564→   564→   564→    case '/history': {
+   565→   565→   565→      const logs = db.query('SELECT * FROM NotificationLog ORDER BY sentAt DESC LIMIT 5').all() as any[];
+   566→   566→   566→      if (logs.length === 0) {
+   567→   567→   567→        await sendMessage(chatId, '📭 Нет уведомлений в истории.');
+   568→   568→   568→        break;
+   569→   569→   569→      }
+   570→   570→   570→
+   571→   571→   571→      let histMsg = '📋 <b>Последние уведомления</b>\n\n';
+   572→   572→   572→      for (const log of logs) {
+   573→   573→   573→        histMsg += `📅 ${log.shiftDate} — <b>${log.shopName}</b>\n`;
+   574→   574→   574→        histMsg += `   Смена: ${log.scheduledAt}\n`;
+   575→   575→   575→        histMsg += `   ${log.acknowledged ? '✅' : '⏳'} Отправлено\n\n`;
+   576→   576→   576→      }
+   577→   577→   577→
+   578→   578→   578→      await sendMessage(chatId, histMsg);
+   579→   579→   579→      break;
+   580→   580→   580→    }
+   581→   581→   581→
+   582→   582→   582→    default:
+   583→   583→   583→      if (text.startsWith('/')) {
+   584→   584→   584→        await sendMessage(chatId, '❓ Неизвестная команда. Используйте /help для справки.');
+   585→   585→   585→      }
+   586→   586→   586→  }
+   587→   587→   587→}
+   588→   588→   588→
+   589→   589→   589→// ============ Polling Loop for Telegram Updates ============
+   590→   590→   590→let lastUpdateId = 0;
+   591→   591→   591→
+   592→   592→   592→async function pollTelegramUpdates() {
+   593→   593→   593→  if (!settings.telegramBotToken) return;
+   594→   594→   594→
+   595→   595→   595→  try {
+   596→   596→   596→    const result = await telegramApi('getUpdates', {
+   597→   597→   597→      offset: lastUpdateId + 1,
+   598→   598→   598→      timeout: 30,
+   599→   599→   599→      allowed_updates: ['message'],
+   600→   600→   600→    });
+   601→   601→   601→
+   602→   602→   602→    if (Array.isArray(result)) {
+   603→   603→   603→      for (const update of result) {
+   604→   604→   604→        lastUpdateId = update.update_id;
+   605→   605→   605→        handleUpdate(update).catch(e => {
+   606→   606→   606→          console.error('[TG] Error handling update:', e);
+   607→   607→   607→        });
+   608→   608→   608→      }
+   609→   609→   609→    }
+   610→   610→   610→  } catch (e: any) {
+   611→   611→   611→    console.error('[TG] Polling error:', e.message);
+   612→   612→   612→  }
+   613→   613→   613→}
+   614→   614→   614→
+   615→   615→   615→// ============ Scheduled Checker ============
+   616→   616→   616→async function scheduledCheck() {
+   617→   617→   617→  const todaySchedule = getTodaySchedule();
+   618→   618→   618→  if (!todaySchedule) return;
+   619→   619→   619→  if (!settings.ytimesApiKey || !settings.telegramBotToken) return;
+   620→   620→   620→
+   621→   621→   621→  const tzDate = getTimezoneDate();
+   622→   622→   622→  const [startHour, startMinute] = todaySchedule.startTime.split(':').map(Number);
+   623→   623→   623→  const shiftStart = new Date(tzDate);
+   624→   624→   624→  shiftStart.setHours(startHour, startMinute, 0, 0);
+   625→   625→   625→
+   626→   626→   626→  const minutesSinceStart = Math.floor((tzDate.getTime() - shiftStart.getTime()) / 60000);
+   627→   627→   627→
+   628→   628→   628→  const shouldCheck =
+   629→   629→   629→    minutesSinceStart >= settings.notificationDelay &&
+   630→   630→   630→    minutesSinceStart <= 180 &&
+   631→   631→   631→    (minutesSinceStart === settings.notificationDelay ||
+   632→   632→   632→     minutesSinceStart === settings.notificationDelay + 30 ||
+   633→   633→   633→     minutesSinceStart === settings.notificationDelay + 60 ||
+   634→   634→   634→     minutesSinceStart === settings.notificationDelay + 90 ||
+   635→   635→   635→     minutesSinceStart === settings.notificationDelay + 120 ||
+   636→   636→   636→     minutesSinceStart === settings.notificationDelay + 150);
+   637→   637→   637→
+   638→   638→   638→  if (shouldCheck) {
+   639→   639→   639→    const todayStr = formatDateDDMMYYYY(tzDate);
+   640→   640→   640→    const existingCheck = db.query(
+   641→   641→   641→      'SELECT * FROM ShiftCheck WHERE checkDate = ? LIMIT 1'
+   642→   642→   642→    ).get(todayStr) as any;
+   643→   643→   643→
+   644→   644→   644→    if (!existingCheck || !existingCheck.notifiedAt) {
+   645→   645→   645→      console.log(`[SCHED] Running scheduled check (${minutesSinceStart}min since shift start)`);
+   646→   646→   646→      await checkShifts();
+   647→   647→   647→    }
+   648→   648→   648→  }
+   649→   649→   649→}
+   650→   650→   650→
+   651→   651→   651→// ============ HTTP Server (for dashboard communication) ============
+   652→   652→   652→const server = Bun.serve({
+   653→   653→   653→  port: PORT,
+   654→   654→   654→  async fetch(req) {
+   655→   655→   655→    const url = new URL(req.url);
+   656→   656→   656→    const path = url.pathname;
+   657→   657→   657→
+   658→   658→   658→    const headers = {
+   659→   659→   659→      'Content-Type': 'application/json',
+   660→   660→   660→      'Access-Control-Allow-Origin': '*',
+   661→   661→   661→      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+   662→   662→   662→      'Access-Control-Allow-Headers': 'Content-Type',
+   663→   663→   663→    };
+   664→   664→   664→
+   665→   665→   665→    if (req.method === 'OPTIONS') {
+   666→   666→   666→      return new Response(null, { status: 200, headers });
+   667→   667→   667→    }
+   668→   668→   668→
+   669→   669→   669→    try {
+   670→   670→   670→      if (path === '/api/check' && req.method === 'POST') {
+   671→   671→   671→        reloadSettings();
+   672→   672→   672→        const result = await checkShifts();
+   673→   673→   673→        return new Response(JSON.stringify(result), { status: 200, headers });
+   674→   674→   674→      }
+   675→   675→   675→
+   676→   676→   676→      if (path === '/api/test-notification' && req.method === 'POST') {
+   677→   677→   677→        reloadSettings();
+   678→   678→   678→        if (settings.adminChatIds.length === 0) {
+   679→   679→   679→          return new Response(JSON.stringify({ success: false, error: 'No admin chat IDs configured' }), { status: 400, headers });
+   680→   680→   680→        }
+   681→   681→   681→        await sendToAllAdmins(
+   682→   682→   682→          '🧪 <b>Тестовое уведомление</b>\n\n' +
+   683→   683→   683→          '✅ BowJones Monitor работает корректно!\n' +
+   684→   684→   684→          `🕐 ${new Date().toLocaleString('ru-RU', { timeZone: settings.timezone })}`
+   685→   685→   685→        );
+   686→   686→   686→        return new Response(JSON.stringify({ success: true, message: 'Test notification sent' }), { status: 200, headers });
+   687→   687→   687→      }
+   688→   688→   688→
+   689→   689→   689→      if (path === '/api/status' && req.method === 'GET') {
+   690→   690→   690→        reloadSettings();
+   691→   691→   691→        const todaySchedule = getTodaySchedule();
+   692→   692→   692→        return new Response(JSON.stringify({
+   693→   693→   693→          configured: !!(settings.ytimesApiKey && settings.telegramBotToken),
+   694→   694→   694→          ytimesConnected: !!settings.ytimesApiKey,
+   695→   695→   695→          telegramConnected: !!settings.telegramBotToken,
+   696→   696→   696→          adminCount: settings.adminChatIds.length,
+   697→   697→   697→          isMuted,
+   698→   698→   698→          todaySchedule: todaySchedule ? {
+   699→   699→   699→            startTime: todaySchedule.startTime,
+   700→   700→   700→            dayOfWeek: todaySchedule.dayOfWeek,
+   701→   701→   701→          } : null,
+   702→   702→   702→          lastCheck: lastCheckTime?.toISOString() || null,
+   703→   703→   703→          timezone: settings.timezone,
+   704→   704→   704→        }), { status: 200, headers });
+   705→   705→   705→      }
+   706→   706→   706→
+   707→   707→   707→      if (path === '/health' && req.method === 'GET') {
+   708→   708→   708→        return new Response(JSON.stringify({ status: 'ok', port: PORT }), { status: 200, headers });
+   709→   709→   709→      }
+   710→   710→   710→
+   711→   711→   711→      return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers });
+   712→   712→   712→    } catch (e: any) {
+   713→   713→   713→      console.error('[HTTP] Error:', e);
+   714→   714→   714→      return new Response(JSON.stringify({ error: e.message }), { status: 500, headers });
+   715→   715→   715→    }
+   716→   716→   716→  },
+   717→   717→   717→});
+   718→   718→   718→
+   719→   719→   719→console.log(`[BOT] BowJones Telegram Bot running on port ${PORT}`);
+   720→   720→   720→
+   721→   721→   721→// ============ Main Loop ============
+   722→   722→   722→reloadSettings();
+   723→   723→   723→
+   724→   724→   724→// Telegram polling every 35 seconds
+   725→   725→   725→setInterval(async () => {
+   726→   726→   726→  try {
+   727→   727→   727→    await pollTelegramUpdates();
+   728→   728→   728→  } catch (e: any) {
+   729→   729→   729→    console.error('[TG] Poll interval error:', e.message);
+   730→   730→   730→  }
+   731→   731→   731→}, 35000);
+   732→   732→   732→
+   733→   733→   733→// Scheduled shift check every minute
+   734→   734→   734→setInterval(async () => {
+   735→   735→   735→  try {
+   736→   736→   736→    reloadSettings();
+   737→   737→   737→    await scheduledCheck();
+   738→   738→   738→  } catch (e: any) {
+   739→   739→   739→    console.error('[SCHED] Check interval error:', e.message);
+   740→   740→   740→  }
+   741→   741→   741→}, 60000);
+   742→   742→   742→
+   743→   743→   743→// Initial setup after 2 seconds
+   744→   744→   744→setTimeout(() => {
+   745→   745→   745→  reloadSettings();
+   746→   746→   746→  console.log('[BOT] Initial settings loaded');
+   747→   747→   747→  console.log(`[BOT] Ytimes API: ${settings.ytimesApiKey ? 'configured' : 'NOT configured'}`);
+   748→   748→   748→  console.log(`[BOT] Telegram: ${settings.telegramBotToken ? 'configured' : 'NOT configured'}`);
+   749→   749→   749→  console.log(`[BOT] Admin chats: ${settings.adminChatIds.length}`);
+   750→   750→   750→  console.log(`[BOT] Schedules: ${schedules.filter(s => s.isEnabled).length} active`);
+   751→   751→   751→}, 2000);
+   752→   752→   752→
+   753→   753→   753→// Initial Telegram poll after 3 seconds
+   754→   754→   754→setTimeout(() => {
+   755→   755→   755→  pollTelegramUpdates().catch(e => {
+   756→   756→   756→    console.error('[TG] Initial poll error:', e);
+   757→   757→   757→  });
+   758→   758→   758→}, 3000);

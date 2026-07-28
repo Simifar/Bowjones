@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://ru.iiko.help/articles/api-documentations/~kassovye-smeny-v2",
+    "name": "Работа со сменами - Документация iiko",
+    "snippet": "Фискальный номер смены (с ФРа). cashRegNumber, Номер ФРа (в нумерации iiko). cashRegSerial, Серийный номер ФРа. openDate, Дата открытия смены. Missing: Ytimes интеграция",
+    "host_name": "ru.iiko.help",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://iiko.github.io/front.api.doc/2021/06/30/open-close-cafe-session.html",
+    "name": "Расширены возможности для открытия и закрытия кассовой",
+    "snippet": "В iikoFront версии 7.7.5 и выше появилась возможность открывать ( OpenCafeSession ) и закрывать ( CloseCafeSession ) кассовую смену любых ... Missing: Ytimes интеграция",
+    "host_name": "iiko.github.io",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=Ce0BJcWxDjc",
+    "name": "Открытие кассовой смены в программе iiko - YouTube",
+    "snippet": "Share your videos with friends, family, and the world. Missing: Ytimes API интеграция",
+    "host_name": "www.youtube.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=3TiOTHHUlt4",
+    "name": "Как настроить интеграции с IIKO - YouTube",
+    "snippet": "Настраиваем интеграцию IIKO с внешними сервисами. Сервис для проверки API https://examples.iiko.ru/server/?example=trn_create_order ... Missing: Ytimes смена открытие кассы",
+    "host_name": "www.youtube.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://ru.iiko.help/articles/iikofront-8-0/topic-73/a/h2_1",
+    "name": "Открытие кассовой смены - Документация iiko",
+    "snippet": "Открытие кассовой смены · Войдите в iikoFront и откройте личную смену. · На экране дополнительного меню нажмите кнопку Открыть кассовую смену.",
+    "host_name": "ru.iiko.help",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://apimonster.ru/connector/bundle/1c-kassa/iiko",
+    "name": "Интеграция 1С:Касса и Iiko (Айко) по API без программиста",
+    "snippet": "2 Настроить вебхук в 1С:Касса, указав ссылку из ApiMonster. · 3 Настроить подключение для Iiko в ApiMonster, ... Missing: Ytimes смена открытие",
+    "host_name": "apimonster.ru",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=tf2hXwrtvds",
+    "name": "Открытие и закрытие кассовой смены в iiko - YouTube",
+    "snippet": "Как открыть и закрыть кассовую смену в системе iiko? Resta.labs — мы автоматизируем рестораны по всей России: – внедряем iiko, ...",
+    "host_name": "www.youtube.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "http://iiko.github.io/front.api.doc/v6/ru/CashRegisters.html",
+    "name": "Внешние фискальные регистраторы - iikoFront API docs",
+    "snippet": "Кассовая смена на iikoFront считается открытой если команда DoOpenSession() выполнится без исключения, help.iiko.ru | api@iiko.ru Missing: Ytimes | Show results with: Ytimes",
+    "host_name": "iiko.github.io",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://howto.iiko.help/articles/iikofront/configuration-files-logs-and-plugins",
+    "name": "Файлы конфигурации, логов и плагинов кассового приложения iiko",
+    "snippet": "После запуска кассового приложения iiko плагин регистрируется, создается его файл конфигурации в папке %AppData%\\iiko\\CashServer\\PluginConfigs. Missing: Ytimes | Show results with: Ytimes",
+    "host_name": "howto.iiko.help",
+    "rank": 8,
+    "date": "Jul 13, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://joinposter.kz/blog/management/top-6-system-ucheta-dlia-restoranov-y-kafe",
+    "name": "ТОП-6 программ для ресторанов и кафе в Казахстане в 2026 году",
+    "snippet": "Интеграции — это то, что превращает программу для ресторана из просто кассы в настоящий центр управления рестораном. Составьте свой «обязательный список»: ...",
+    "host_name": "joinposter.kz",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
