@@ -91,3 +91,4 @@ Vercel будет использовать `vercel.json` для запуска �
 - `src/app/api/check-now/route.ts` служит точкой ручного и автоматического запуска проверки.
 - `src/app/api/bot-webhook/route.ts` принимает обновления от Telegram. Для установки webhook откройте `GET /api/bot-webhook?set` после деплоя.
 - Поддерживаемые команды бота: `/start`, `/help`, `/status`, `/check`, `/mute`, `/unmute`.
+-
