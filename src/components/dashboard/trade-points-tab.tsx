@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { RefreshCw, Store, MapPin, Phone, Building2 } from 'lucide-react';
+import { apiHeaders } from '@/lib/api-client';
 
 interface TradePoint {
   id: string;
@@ -35,7 +36,7 @@ const staggerContainer = {
 
 const staggerItem = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
 export function TradePointsTab() {
@@ -63,7 +64,10 @@ export function TradePointsTab() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/trade-points/sync', { method: 'POST' });
+      const res = await fetch('/api/trade-points/sync', {
+        method: 'POST',
+        headers: apiHeaders(),
+      });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message || 'Синхронизация завершена');

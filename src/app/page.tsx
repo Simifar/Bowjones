@@ -21,9 +21,7 @@ import {
   Moon,
   Sun,
   AlertTriangle,
-  Github,
   Heart,
-  ExternalLink,
 } from 'lucide-react';
 
 function UnconfiguredBanner({ onGoToSettings }: { onGoToSettings: () => void }) {
@@ -31,7 +29,7 @@ function UnconfiguredBanner({ onGoToSettings }: { onGoToSettings: () => void }) 
     <motion.div
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={{ duration: 0.4, ease: 'easeOut' as const }}
       className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8"
     >
       <div className="flex items-center gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 sm:p-4 shadow-sm">
@@ -86,7 +84,7 @@ export default function Home() {
 
   const tabVariants = {
     hidden: { opacity: 0, y: 8 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
     exit: { opacity: 0, y: -8, transition: { duration: 0.15 } },
   };
 
@@ -151,7 +149,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-6 w-full flex flex-wrap h-auto gap-1 bg-muted/60 p-1">
-              {tabs.map((tab, i) => (
+              {tabs.map((tab) => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
@@ -171,22 +169,22 @@ export default function Home() {
                 animate="visible"
                 exit="exit"
               >
-                <TabsContent value="overview" forceMount={false}>
+                <TabsContent value="overview">
                   <DashboardOverview />
                 </TabsContent>
-                <TabsContent value="settings" forceMount={false}>
+                <TabsContent value="settings">
                   <SettingsTab />
                 </TabsContent>
-                <TabsContent value="schedule" forceMount={false}>
+                <TabsContent value="schedule">
                   <ScheduleTab />
                 </TabsContent>
-                <TabsContent value="notifications" forceMount={false}>
+                <TabsContent value="notifications">
                   <NotificationsTab />
                 </TabsContent>
-                <TabsContent value="trade-points" forceMount={false}>
+                <TabsContent value="trade-points">
                   <TradePointsTab />
                 </TabsContent>
-                <TabsContent value="check-logs" forceMount={false}>
+                <TabsContent value="check-logs">
                   <CheckLogsTab />
                 </TabsContent>
               </motion.div>

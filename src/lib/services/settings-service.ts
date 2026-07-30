@@ -54,9 +54,6 @@ export async function getSettingsSummary() {
   const settings = await getBotSettings();
   return {
     id: settings.id,
-    ytimesApiKey: settings.ytimesApiKey,
-    telegramBotToken: settings.telegramBotToken,
-    adminChatIds: settings.adminChatIds,
     notificationDelay: settings.notificationDelay,
     timezone: settings.timezone,
     isMuted: settings.isMuted,

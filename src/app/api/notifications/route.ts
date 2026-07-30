@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clearNotifications, listNotifications } from '@/lib/services/notifications-service';
+import { requireApiAuth } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const unauthorized = requireApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const result = await clearNotifications();
     return NextResponse.json({ success: true, deletedCount: result.count });

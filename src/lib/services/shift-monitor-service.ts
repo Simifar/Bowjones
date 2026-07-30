@@ -1,5 +1,4 @@
-import { prisma } from '@/lib/prisma';
-import { getBotSettings } from './settings-service';
+import { getBotSettings, updateMuteState } from './settings-service';
 import { getTodaySchedule } from './schedule-service';
 import { YtimesClient } from './ytimes-client';
 import { TelegramClient, parseAdminChatIds } from './telegram-client';
@@ -20,8 +19,22 @@ function getTimezoneDate(timezone: string) {
 }
 
 export async function runShiftMonitoring(options: { force?: boolean } = {}) {
-  const settings = await getBotSettings();
+  let settings = await getBotSettings();
   const todaySchedule = await getTodaySchedule();
+
+  // Check and auto-expire mute
+  if (settings.isMuted && settings.muteUntil && new Date(settings.muteUntil) < new Date()) {
+    settings = await updateMuteState(false, null);
+  }
+
+  if (settings.isMuted) {
+    return {
+      success: true,
+      checked: false,
+      message: 'Notifications are muted',
+      notifications: [],
+    };
+  }
 
   if (!settings.ytimesApiKey || !settings.telegramBotToken || !todaySchedule) {
     return {

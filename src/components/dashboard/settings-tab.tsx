@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -31,8 +30,8 @@ import {
   Loader2,
   Bot,
   Database,
-  Settings2,
 } from 'lucide-react';
+import { jsonHeaders } from '@/lib/api-client';
 
 const RUSSIAN_TIMEZONES = [
   { value: 'Europe/Kaliningrad', label: 'Калининград (UTC+2)' },
@@ -56,7 +55,7 @@ const staggerContainer = {
 
 const staggerItem = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
 function FieldTooltip({ text }: { text: string }) {
@@ -130,16 +129,19 @@ export function SettingsTab() {
         .split(',')
         .map((id) => id.trim())
         .filter(Boolean);
+
+      const payload: Record<string, unknown> = {
+        notificationDelay: form.notificationDelay,
+        timezone: form.timezone,
+      };
+      if (form.ytimesApiKey) payload.ytimesApiKey = form.ytimesApiKey;
+      if (form.telegramBotToken) payload.telegramBotToken = form.telegramBotToken;
+      if (chatIdArray.length > 0) payload.adminChatIds = JSON.stringify(chatIdArray);
+
       const res = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ytimesApiKey: form.ytimesApiKey,
-          telegramBotToken: form.telegramBotToken,
-          adminChatIds: JSON.stringify(chatIdArray),
-          notificationDelay: form.notificationDelay,
-          timezone: form.timezone,
-        }),
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         toast.success('Настройки сохранены');

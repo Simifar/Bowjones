@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sendTestNotification } from '@/lib/services/telegram-client';
+import { requireApiAuth } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const unauthorized = requireApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const result = await sendTestNotification();
     return NextResponse.json({ success: true, result });

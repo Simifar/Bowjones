@@ -16,29 +16,29 @@ export async function syncTradePoints() {
   const client = new YtimesClient(settings.ytimesApiKey);
   const rows = await client.getShops();
 
-  const results = await prisma.$transaction(
-    rows.map((row) =>
-      prisma.tradePoint.upsert({
-        where: { guid: row.guid },
-        update: {
-          name: row.name,
-          type: row.type ?? '',
-          cityName: row.cityName ?? '',
-          address: row.address ?? '',
-          phone: row.phone ?? '',
-          updatedAt: new Date(),
-        },
-        create: {
-          guid: row.guid,
-          name: row.name,
-          type: row.type ?? '',
-          cityName: row.cityName ?? '',
-          address: row.address ?? '',
-          phone: row.phone ?? '',
-        },
-      }),
-    )),
+  const operations = rows.map((row) =>
+    prisma.tradePoint.upsert({
+      where: { guid: row.guid },
+      update: {
+        name: row.name,
+        type: row.type ?? '',
+        cityName: row.cityName ?? '',
+        address: row.address ?? '',
+        phone: row.phone ?? '',
+        updatedAt: new Date(),
+      },
+      create: {
+        guid: row.guid,
+        name: row.name,
+        type: row.type ?? '',
+        cityName: row.cityName ?? '',
+        address: row.address ?? '',
+        phone: row.phone ?? '',
+      },
+    }),
   );
+
+  const results = await prisma.$transaction(operations);
 
   return {
     syncedCount: results.length,

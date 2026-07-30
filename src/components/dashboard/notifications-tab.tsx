@@ -41,6 +41,7 @@ import {
   Inbox,
   Calendar,
 } from 'lucide-react';
+import { apiHeaders } from '@/lib/api-client';
 
 interface Notification {
   id: string;
@@ -69,7 +70,7 @@ const staggerContainer = {
 
 const staggerItem = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
 export function NotificationsTab() {
@@ -121,7 +122,10 @@ export function NotificationsTab() {
   const handleClear = async () => {
     setClearing(true);
     try {
-      const res = await fetch('/api/notifications', { method: 'DELETE' });
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: apiHeaders(),
+      });
       if (res.ok) {
         toast.success('История уведомлений очищена');
         fetchNotifications(1);
@@ -141,6 +145,7 @@ export function NotificationsTab() {
     try {
       const res = await fetch(`/api/notifications/acknowledge?id=${id}`, {
         method: 'PATCH',
+        headers: apiHeaders(),
       });
       if (res.ok) {
         setData((prev) => ({

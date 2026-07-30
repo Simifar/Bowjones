@@ -1,53 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { z } from 'zod'
+import { NextRequest, NextResponse } from 'next/server';
+import { handleTelegramUpdate } from '@/lib/bot/handlers';
+import { getBotSettings } from '@/lib/services/settings-service';
+import { appConfig } from '@/lib/config';
 
-const notificationWebhookSchema = z.object({
-  type: z.string(),
-  data: z.object({
-    shopName: z.string(),
-    shopGuid: z.string(),
-    shiftDate: z.string(),
-    scheduledAt: z.string(),
-    message: z.string(),
-  }),
-})
+const webhookUrl = `${appConfig.appBaseUrl}/api/bot-webhook`;
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  if (!searchParams.has('set')) {
+    return NextResponse.json({ webhookUrl });
+  }
+
+  const settings = await getBotSettings();
+  if (!settings.telegramBotToken) {
+    return NextResponse.json({ error: 'Telegram bot token is not configured' }, { status: 400 });
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.telegramBotToken}/setWebhook`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl }),
+      },
+    );
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.ok ? 200 : 400 });
+  } catch (error) {
+    console.error('Failed to set Telegram webhook:', error);
+    return NextResponse.json({ error: 'Failed to set webhook' }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const parsed = notificationWebhookSchema.safeParse(body)
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid webhook payload', details: parsed.error.errors },
-        { status: 400 },
-      )
-    }
-
-    const { type, data } = parsed.data
-
-    if (type === 'notification_sent') {
-      const log = await db.notificationLog.create({
-        data: {
-          shopName: data.shopName,
-          shopGuid: data.shopGuid,
-          shiftDate: data.shiftDate,
-          scheduledAt: data.scheduledAt,
-          message: data.message,
-        },
-      })
-
-      return NextResponse.json({ success: true, id: log.id })
-    }
-
-    // Acknowledge other event types without logging
-    return NextResponse.json({ success: true, acknowledged: true, type })
+    const body = await request.json();
+    await handleTelegramUpdate(body);
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to process bot webhook:', error)
-    return NextResponse.json(
-      { error: 'Failed to process webhook' },
-      { status: 500 },
-    )
+    console.error('Failed to process Telegram update:', error);
+    return NextResponse.json({ error: 'Failed to process update' }, { status: 500 });
   }
 }

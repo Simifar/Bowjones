@@ -1,6 +1,6 @@
 # BowJones Monitor
 
-BowJones Monitor — это панель управления для Telegram-бота, который мониторит открытие касс торговых точек через Ytimes API и уведомляет администратора.
+BowJones Monitor — панель управления для мониторинга открытия касс торговых точек через Ytimes API и уведомлений в Telegram.
 
 ## Цели
 - Веб-интерфейс на Next.js + TailwindCSS
@@ -11,7 +11,7 @@ BowJones Monitor — это панель управления для Telegram-б
 ## Технологии
 - Next.js 16
 - React 19
-- Tailwind CSS
+- Tailwind CSS 4
 - Prisma
 - PostgreSQL / Neon
 - Telegram Bot API
@@ -22,7 +22,7 @@ BowJones Monitor — это панель управления для Telegram-б
 1. Установите зависимости:
 
 ```bash
-npm install
+bun install
 ```
 
 2. Скопируйте пример env-файла и заполните значения:
@@ -36,23 +36,23 @@ cp .env.example .env
 4. Сгенерируйте Prisma Client и примените схему:
 
 ```bash
-npx prisma generate
-npx prisma db push
+bunx prisma generate
+bunx prisma db push
 ```
 
 5. Запустите локально:
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 ## Переменные окружения
 
-Файл `.env.example` содержит необходимые переменные:
-
 - `DATABASE_URL` — подключение к базе данных PostgreSQL/Neon
-- `BOT_SERVICE_URL` — URL бэкенда (локально `http://localhost:3003`)
+- `SHADOW_DATABASE_URL` — опциональная теневая БД для Prisma Migrate
 - `APP_BASE_URL` — базовый URL приложения
+- `NEXTAUTH_URL` — URL для NextAuth
+- `NEXTAUTH_SECRET` — секретный ключ для NextAuth (минимум 32 символа)
 - `DEFAULT_TIMEZONE` — часовой пояс по умолчанию
 - `DEFAULT_NOTIFICATION_DELAY` — задержка до уведомления (в минутах)
 - `DEFAULT_PAGE_SIZE` — размер страницы
@@ -73,18 +73,21 @@ npm run dev
 
 - `DATABASE_URL`
 - `APP_BASE_URL`
+- `NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
 - `DEFAULT_TIMEZONE`
 - `DEFAULT_NOTIFICATION_DELAY`
 - `YTIMES_BASE_URL`
 
-Vercel будет использовать `vercel.json` для запуска функции `/api/check-now` по расписанию.
+Vercel будет использовать `vercel.json` для запуска функции `/api/check-now` по расписанию (cron доступен на Pro-плане; на бесплатном используйте внешний cron-сервис).
 
 ## CI / GitHub Actions
 
-В каталоге `.github/workflows` настроен базовый workflow для линтинга и сборки проекта.
+В каталоге `.github/workflows` настроен workflow для линтинга, проверки типов и сборки проекта на Bun.
 
 ## Дополнительно
 
-- Для тестового уведомления используйте Telegram Bot Token и chat ID администратора.
 - `src/lib/services/shift-monitor-service.ts` содержит основную проверку точек и отправку уведомлений.
-- `src/app/api/check-now/route.ts` служит точкой ручного запуска проверки.
+- `src/app/api/check-now/route.ts` служит точкой ручного и автоматического запуска проверки.
+- `src/app/api/bot-webhook/route.ts` принимает обновления от Telegram. Для установки webhook откройте `GET /api/bot-webhook?set` после деплоя.
+- Поддерживаемые команды бота: `/start`, `/help`, `/status`, `/check`, `/mute`, `/unmute`.

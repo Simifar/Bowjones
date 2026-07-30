@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acknowledgeNotification } from '@/lib/services/notifications-service';
+import { requireApiAuth } from '@/lib/auth';
 
 export async function PATCH(request: NextRequest) {
+  const unauthorized = requireApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

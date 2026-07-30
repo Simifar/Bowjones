@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
-  Bot,
   Clock,
   Bell,
   RefreshCw,
@@ -17,8 +16,6 @@ import {
   CheckCircle2,
   XCircle,
   Wifi,
-  WifiOff,
-  Server,
   TrendingUp,
   CalendarCheck,
   AlertTriangle,
@@ -27,6 +24,7 @@ import {
   Eye,
   MapPin,
 } from 'lucide-react';
+import { apiHeaders } from '@/lib/api-client';
 
 interface StatusData {
   isBotConfigured: boolean;
@@ -50,20 +48,6 @@ interface StatusData {
   timezone: string;
 }
 
-interface BotHealthData {
-  status: 'ok' | 'unreachable';
-  uptime: number;
-  lastCheckTime: string | null;
-  isMuted: boolean;
-  muteUntil?: string | null;
-}
-
-interface Schedule {
-  dayOfWeek: number;
-  startTime: string;
-  isEnabled: boolean;
-}
-
 interface Notification {
   id: string;
   shopName: string;
@@ -81,19 +65,16 @@ const staggerContainer = {
 
 const staggerItem = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
 export function DashboardOverview() {
   const [status, setStatus] = useState<StatusData | null>(null);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
-  const [botServiceUp, setBotServiceUp] = useState<boolean | null>(null);
-  const [botHealth, setBotHealth] = useState<BotHealthData | null>(null);
   const [stats, setStats] = useState<{
     totalNotifications: number;
     lastNotificationTime: string | null;
@@ -102,30 +83,16 @@ export function DashboardOverview() {
   } | null>(null);
   const [lastCheckShop, setLastCheckShop] = useState<string>('');
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      const res = await fetch('/api/status');
-      const data = await res.json();
-      setStatus(data);
-      return data;
-    } catch {
-      return null;
-    }
-  }, []);
-
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statusRes, schedulesRes, notifsRes] = await Promise.all([
+        const [statusRes, notifsRes] = await Promise.all([
           fetch('/api/status'),
-          fetch('/api/schedules'),
           fetch('/api/notifications?page=1&pageSize=5'),
         ]);
         const statusData = await statusRes.json();
-        const schedulesData = await schedulesRes.json();
         const notifsData = await notifsRes.json();
         setStatus(statusData);
-        setSchedules(schedulesData);
         setNotifications(notifsData.notifications?.slice(0, 5) ?? []);
 
         // Fetch stats
@@ -223,27 +190,6 @@ export function DashboardOverview() {
     return () => clearInterval(interval);
   }, [status?.timezone]);
 
-  // Check bot service health
-  useEffect(() => {
-    const checkBotService = async () => {
-      try {
-        const res = await fetch('/api/bot-health', {
-          signal: AbortSignal.timeout(3000),
-        });
-        const data = await res.json();
-        setBotServiceUp(data.status === 'ok');
-        setBotHealth(data);
-      } catch {
-        setBotServiceUp(false);
-        setBotHealth(null);
-      }
-    };
-
-    checkBotService();
-    const interval = setInterval(checkBotService, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Find last check shop name
   useEffect(() => {
     if (status?.lastCheck?.shopGuid) {
@@ -263,7 +209,7 @@ export function DashboardOverview() {
     setActionLoading(action);
     try {
       const url = action.includes('/') ? `/api/${action}` : `/api/${action}`;
-      const res = await fetch(url, { method: 'POST' });
+      const res = await fetch(url, { method: 'POST', headers: apiHeaders() });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message || `${label} выполнено`);
@@ -279,7 +225,7 @@ export function DashboardOverview() {
 
   // Calculate mute remaining time
   const getMuteRemaining = () => {
-    const muteUntilStr = botHealth?.muteUntil || status?.muteUntil;
+    const muteUntilStr = status?.muteUntil;
     if (!muteUntilStr) return null;
     const muteUntil = new Date(muteUntilStr);
     const now = new Date();
@@ -304,17 +250,13 @@ export function DashboardOverview() {
   }
 
   const todaySchedule = status?.todaySchedule;
-  const isShiftToday = todaySchedule?.isEnabled;
   const timezone = status?.timezone || 'Asia/Yekaterinburg';
   const muteRemaining = getMuteRemaining();
-  const isMuted = status?.isMuted || botHealth?.isMuted || false;
-
-  // Shop name for last check
-  const lastCheckShopName = lastCheckShop || status?.lastCheck?.shopGuid || null;
+  const isMuted = status?.isMuted || false;
 
   // Timeline calculations
   const getTimelineData = () => {
-    if (!isShiftToday || !todaySchedule) return null;
+    if (!todaySchedule || !todaySchedule.isEnabled) return null;
     const now = new Date();
     const [h, m] = todaySchedule.startTime.split(':').map(Number);
     const shiftStartMin = (h ?? 8) * 60 + (m ?? 0);
@@ -449,7 +391,7 @@ export function DashboardOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <StatusDot
                 isUp={!!status?.isBotConfigured}
                 label="Telegram"
@@ -459,11 +401,6 @@ export function DashboardOverview() {
                 isUp={!!status?.isYtimesConnected}
                 label="Ytimes API"
                 tooltip={status?.isYtimesConnected ? 'API ключ Ytimes настроен' : 'API ключ Ytimes не указан'}
-              />
-              <StatusDot
-                isUp={botServiceUp}
-                label="Сервис бота"
-                tooltip={botServiceUp === null ? 'Проверяем...' : botServiceUp ? `Работает, аптайм: ${Math.floor((botHealth?.uptime ?? 0) / 60)} мин` : 'Сервис бота не отвечает'}
               />
             </div>
           </CardContent>
@@ -547,7 +484,7 @@ export function DashboardOverview() {
                 {/* Shift info */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    Смена: <span className="font-medium text-foreground">{todaySchedule.startTime}</span>
+                    Смена: <span className="font-medium text-foreground">{todaySchedule?.startTime}</span>
                   </span>
                   <span className="text-muted-foreground">
                     {timeline.current < timeline.shiftStart ? (

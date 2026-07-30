@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { syncTradePoints } from '@/lib/services/trade-points-service';
+import { requireApiAuth } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const unauthorized = requireApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const payload = await syncTradePoints();
     return NextResponse.json({ success: true, ...payload });
